@@ -8,6 +8,8 @@ import { EmailService } from './email.service';
 import * as path from 'path';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
@@ -25,6 +27,6 @@ import { AuthController } from './auth.controller';
     ]),
   ],
   controllers: [AppController, AuthController],
-  providers: [AppService, PrismaService, AIService, EmailService],
+  providers: [AppService, PrismaService, AIService, EmailService, AuthService, JwtStrategy],
 })
 export class AppModule {}
