@@ -19,8 +19,8 @@ constructor(private configService: ConfigService) {
 }
 
   onModuleInit() {
-    // Usamos gemini-3-flash para que sea rápido y barato
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    // gemini-2.0-flash-lite: rápido, barato y 30 RPM en free tier (el doble que flash)
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
   }
 
   private async generateWithRetry(prompt: string, retries = 3): Promise<string> {
