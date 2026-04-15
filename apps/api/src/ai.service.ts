@@ -46,6 +46,8 @@ constructor(private configService: ConfigService) {
 
     const result = await this.model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    // Gemini a veces envuelve el JSON en bloques markdown, los limpiamos
+    const raw = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    return raw;
   }
 }
