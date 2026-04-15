@@ -15,9 +15,9 @@ import { EmailService } from './email.service';
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly aiService: AIService, // Inyectamos el servicio de IA
-    private readonly prisma: PrismaService, // Inyectamos el servicio de Prisma
-    private readonly emailService: EmailService, // Inyectamos el servicio de Email
+    private readonly aiService: AIService,
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
   ) {}
 
   @Get()
@@ -27,37 +27,66 @@ export class AppController {
 
   @Post('ticket/analyze')
   async analyze(@Body('description') description: string) {
-    const analysisString = await this.aiService.analyzeTicket(description);
-    const analysis = JSON.parse(
-      analysisString.replace(/```json|```/g, '').trim(),
-    );
-
-    // 1. Guardar en DB (lo que ya tienes)
-    const newTicket = await this.prisma.ticket.create({
-      data: {
-        description,
-        category: analysis.categoria,
-        priority: analysis.prioridad,
-        aiSummary: analysis.resumen,
-        status: 'OPEN',
-      },
-    });
-
-    // 2. Lógica de Negocio: Notificar si es grave
-    if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
-      await this.emailService.sendUrgentNotification(
-        analysis.categoria,
-        analysis.resumen,
-        analysis.prioridad,
+    // 1. Validación básica de entrada
+    if (!description) {
+      throw new HttpException(
+        'La descripción es obligatoria',
+        HttpStatus.BAD_REQUEST,
       );
     }
 
-    return {
-      message: 'Ticket procesado con éxito',
-      ticketId: newTicket.id,
-      urgentNotified: ['ALTA', 'CRITICA'].includes(analysis.prioridad),
-    };
-    
-  
+    try {
+      // 2. Obtener y limpiar respuesta de la IA
+      const analysisString = await this.aiService.analyzeTicket(description);
+      const cleanJson = analysisString.replace(/```json|```/g, '').trim();
+      const analysis = JSON.parse(cleanJson);
+
+      // 3. Persistencia en Supabase via Prisma
+      // Nota: propertyId y reporterId se omiten porque quedaron opcionales en el schema
+      const newTicket = await this.prisma.ticket.create({
+        data: {
+          description,
+          category: analysis.categoria,
+          priority: analysis.prioridad,
+          aiSummary: analysis.resumen,
+          status: 'OPEN',
+        },
+      });
+
+      // 4. Lógica de Notificación Automática
+      let notified = false;
+      const isUrgent = ['ALTA', 'CRITICA'].includes(analysis.prioridad);
+
+      if (isUrgent) {
+        await this.emailService.sendUrgentNotification(
+          analysis.categoria,
+          analysis.resumen,
+          analysis.prioridad,
+        );
+        notified = true;
+      }
+
+      // 5. Respuesta estructurada
+      return {
+        success: true,
+        message: 'Ticket procesado y guardado correctamente',
+        data: {
+          id: newTicket.id,
+          categoria: newTicket.category,
+          prioridad: newTicket.priority,
+          resumen: newTicket.aiSummary,
+          notificado: notified,
+        },
+        suggestions: analysis.pasos_sugeridos || [],
+      };
+
+    } catch (error) {
+      // Manejo de errores para evitar el 500 genérico si falla la IA o el JSON
+      console.error('Error en el proceso de análisis:', error);
+      throw new HttpException(
+        'Error interno al procesar el ticket. Revisa los logs del servidor.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }
