@@ -27,7 +27,31 @@ export class AppController {
   getHello() {
     return this.appService.getHello();
   }
+@Get('tickets')
+  @ApiOperation({ summary: 'Obtiene el historial de tickets analizados' })
+  @ApiResponse({ status: 200, description: 'Lista de tickets recuperada con éxito.' })
+  async getTickets() {
+    try {
+      const tickets = await this.prisma.ticket.findMany({
+        orderBy: {
+          createdAt: 'desc', // Los más nuevos primero
+        },
+        take: 20, // Limitamos a los últimos 20 por ahora
+      });
 
+      return {
+        success: true,
+        count: tickets.length,
+        data: tickets,
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Error al recuperar los tickets de la base de datos',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+  
   @Post('ticket/analyze')
   @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
   @ApiResponse({ status: 201, description: 'Ticket procesado y guardado con éxito.' })
