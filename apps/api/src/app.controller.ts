@@ -11,7 +11,7 @@ import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'; // <-- Imports
+import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger'; // <-- Imports
 
 @ApiTags('Tickets')
 @Controller()
@@ -51,7 +51,7 @@ export class AppController {
       );
     }
   }
-  
+
   @ApiBearerAuth() // <--- Esto le dice a Swagger: "Este endpoint requiere Token"
   @Post('ticket/analyze')
   @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
