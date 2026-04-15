@@ -10,6 +10,7 @@ import { AppService } from './app.service';
 import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
+import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
 
 @Controller()
 export class AppController {
