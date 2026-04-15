@@ -35,13 +35,9 @@ export class AppController {
         description,
         category: analysis.categoria,
         priority: analysis.prioridad,
-        aiSummary: analysis.resumen, // <--- Cambiado de summary a aiSummary
+        aiSummary: analysis.resumen,
         status: 'OPEN',
-        // ⚠️ OJO: Tu esquema pide propertyId y reporterId obligatorios.
-        // Para que no te dé error ahora, vamos a poner IDs de prueba
-        // (Asegúrate de que estos IDs existan en tu DB o hazlos opcionales en el schema)
-        propertyId: 'id-de-propiedad-de-prueba',
-        reporterId: 'id-de-usuario-de-prueba',
+        // ¡Eliminamos propertyId y reporterId de aquí para que no choquen con la DB!
       },
     });
 
