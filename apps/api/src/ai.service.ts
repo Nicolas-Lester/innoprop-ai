@@ -23,6 +23,25 @@ constructor(private configService: ConfigService) {
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   }
 
+  private async generateWithRetry(prompt: string, retries = 3): Promise<string> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        return response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      } catch (error: any) {
+        const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
+        if (isRateLimit && attempt < retries) {
+          // Espera 2^attempt segundos (2s, 4s, 8s)
+          await new Promise(res => setTimeout(res, 2 ** attempt * 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('No se pudo obtener respuesta de la IA tras varios intentos');
+  }
+
   async analyzeTicket(description: string) {
     const prompt = `
       Eres un asistente experto en gestión inmobiliaria para InnoProp AI.
@@ -44,10 +63,7 @@ constructor(private configService: ConfigService) {
       }
     `;
 
-    const result = await this.model.generateContent(prompt);
-    const response = await result.response;
-    // Gemini a veces envuelve el JSON en bloques markdown, los limpiamos
-    const raw = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const raw = await this.generateWithRetry(prompt);
     return raw;
   }
 }
