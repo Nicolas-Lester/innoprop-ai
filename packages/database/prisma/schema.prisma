@@ -53,9 +53,9 @@ model Ticket {
   priority    String?  // Detectado por IA (Urgente, Alta, Media, Baja)
   aiSummary   String?  // Resumen técnico hecho por la IA
   status      String   @default("OPEN")
-  propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id])
-  reporterId  String
-  reporter    User     @relation(fields: [reporterId], references: [id])
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id])
+  reporterId  String?
+  reporter    User?     @relation(fields: [reporterId], references: [id])
   createdAt   DateTime @default(now())
 }
