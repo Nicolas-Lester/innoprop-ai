@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class AIService implements OnModuleInit {
   private genAI: GoogleGenerativeAI;
-  private model: GenerativeModel;
+  private model!: GenerativeModel;
 
 constructor(private configService: ConfigService) {
   const apiKey = this.configService.get<string>('GEMINI_API_KEY');
