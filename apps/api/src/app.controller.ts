@@ -9,6 +9,7 @@ import {
 import { AppService } from './app.service';
 import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
+import { EmailService } from './email.service';
 
 @Controller()
 export class AppController {
@@ -16,6 +17,7 @@ export class AppController {
     private readonly appService: AppService,
     private readonly aiService: AIService, // Inyectamos el servicio de IA
     private readonly prisma: PrismaService, // Inyectamos el servicio de Prisma
+    private readonly emailService: EmailService, // Inyectamos el servicio de Email
   ) {}
 
   @Get()
@@ -25,11 +27,12 @@ export class AppController {
 
   @Post('ticket/analyze')
   async analyze(@Body('description') description: string) {
-    // 1. Obtenemos el análisis de la IA
     const analysisString = await this.aiService.analyzeTicket(description);
-    const analysis = JSON.parse(analysisString);
+    const analysis = JSON.parse(
+      analysisString.replace(/```json|```/g, '').trim(),
+    );
 
-    // 2. Lo guardamos en Supabase usando Prisma
+    // 1. Guardar en DB (lo que ya tienes)
     const newTicket = await this.prisma.ticket.create({
       data: {
         description,
@@ -37,14 +40,22 @@ export class AppController {
         priority: analysis.prioridad,
         aiSummary: analysis.resumen,
         status: 'OPEN',
-        // ¡Eliminamos propertyId y reporterId de aquí para que no choquen con la DB!
       },
     });
 
+    // 2. Lógica de Negocio: Notificar si es grave
+    if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
+      await this.emailService.sendUrgentNotification(
+        analysis.categoria,
+        analysis.resumen,
+        analysis.prioridad,
+      );
+    }
+
     return {
-      message: 'Ticket creado y analizado con éxito',
-      data: newTicket,
-      suggestions: analysis.pasos_sugeridos,
+      message: 'Ticket procesado con éxito',
+      ticketId: newTicket.id,
+      urgentNotified: ['ALTA', 'CRITICA'].includes(analysis.prioridad),
     };
   }
 }
