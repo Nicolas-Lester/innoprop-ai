@@ -7,6 +7,7 @@ import { AIService } from './ai.service';
 import { EmailService } from './email.service';
 import * as path from 'path';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AuthController } from './auth.controller';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
       },
     ]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, AuthController],
   providers: [AppService, PrismaService, AIService, EmailService],
 })
 export class AppModule {}
