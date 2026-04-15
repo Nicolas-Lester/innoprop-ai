@@ -177,7 +177,7 @@ export class AppController {
     @UploadedFile() file: Express.Multer.File,
     @GetUser() user: any,
   ) {
-    let imageUrl = null;
+    let imageUrl: string | null = null;
 
     // 1. Si hay una foto, la subimos a Supabase
     if (file) {
