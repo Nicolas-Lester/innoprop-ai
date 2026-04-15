@@ -52,6 +52,7 @@ export class AppController {
     }
   }
   
+  @ApiBearerAuth() // <--- Esto le dice a Swagger: "Este endpoint requiere Token"
   @Post('ticket/analyze')
   @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
   @ApiResponse({ status: 201, description: 'Ticket procesado y guardado con éxito.' })

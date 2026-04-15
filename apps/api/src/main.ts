@@ -16,6 +16,7 @@ async function bootstrap() {
     .setDescription('Plataforma inteligente de gestión de propiedades con IA')
     .setVersion('1.0')
     .addTag('Tickets')
+    .addBearerAuth() // <--- AGREGA ESTA LÍNEA para habilitar JWT en Swagger
     .build();
     
   const document = SwaggerModule.createDocument(app, config);
