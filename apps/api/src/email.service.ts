@@ -16,8 +16,8 @@ export class EmailService {
 
   async sendUrgentNotification(category: string, summary: string, priority: string) {
     const { data, error } = await this.resend.emails.send({
-      from: 'InnoProp AI <alertas@tu-dominio.com>', // Usa 'onboarding@resend.dev' para pruebas
-      to: ['administrador@ejemplo.com'], 
+      from: 'InnoProp AI <onboarding@resend.dev>',
+      to: ['nicolasherreramontes625@gmail.com'], // En free tier solo puedes enviar a tu propio email de Resend
       subject: `🚨 ALERTA: Ticket ${priority} - ${category}`,
       html: `
         <h1>Se ha detectado un problema urgente</h1>
