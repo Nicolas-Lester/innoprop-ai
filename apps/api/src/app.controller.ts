@@ -5,16 +5,25 @@ import {
   Body,
   HttpException,
   HttpStatus,
-  UseGuards, 
+  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport'; 
+import 'multer'; // <--- AGREGA ESTA IMPORTACIÓN SOLITA
+import { AuthGuard } from '@nestjs/passport';
 import { AppService } from './app.service';
 import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { GetUser } from './common/decorators/get-user.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadedFile, UseInterceptors } from '@nestjs/common';
+import { StorageService } from './storage.service'; // Importa el nuevo servicio
 
 @ApiTags('Tickets')
 @Controller()
@@ -24,6 +33,7 @@ export class AppController {
     private readonly aiService: AIService,
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly storageService: StorageService, // Inyecta el servicio de almacenamiento
   ) {}
 
   @Get()
@@ -35,7 +45,10 @@ export class AppController {
   @ApiBearerAuth()
   @Get('tickets')
   @ApiOperation({ summary: 'Obtiene el historial de tickets analizados' })
-  @ApiResponse({ status: 200, description: 'Lista de tickets recuperada con éxito.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de tickets recuperada con éxito.',
+  })
   async getTickets() {
     try {
       const tickets = await this.prisma.ticket.findMany({
@@ -60,11 +73,14 @@ export class AppController {
   @ApiBearerAuth()
   @Post('ticket/analyze')
   @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
-  @ApiResponse({ status: 201, description: 'Ticket procesado y guardado con éxito.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Ticket procesado y guardado con éxito.',
+  })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   async analyze(
     @Body() body: AnalyzeTicketDto,
-    @GetUser() user: any // <--- Aquí ya tenemos al usuario (userId y email)
+    @GetUser() user: any, // <--- Aquí ya tenemos al usuario (userId y email)
   ) {
     const { description } = body;
 
@@ -105,7 +121,7 @@ export class AppController {
           categoria: newTicket.category,
           prioridad: newTicket.priority,
           notificado: notified,
-          usuario: user.email // Para confirmar en la respuesta
+          usuario: user.email, // Para confirmar en la respuesta
         },
         suggestions: analysis.pasos_sugeridos || [],
       };
@@ -121,13 +137,15 @@ export class AppController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Get('tickets/me')
-  @ApiOperation({ summary: 'Obtiene solo los tickets creados por el usuario logueado' })
+  @ApiOperation({
+    summary: 'Obtiene solo los tickets creados por el usuario logueado',
+  })
   @ApiResponse({ status: 200, description: 'Lista de tus tickets recuperada.' })
   async getMyTickets(@GetUser('userId') userId: string) {
     try {
       const tickets = await this.prisma.ticket.findMany({
-        where: { 
-          reporterId: userId // <--- Aquí ocurre el filtro de seguridad
+        where: {
+          reporterId: userId, // <--- Aquí ocurre el filtro de seguridad
         },
         orderBy: {
           createdAt: 'desc',
@@ -145,5 +163,57 @@ export class AppController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  @Post('ticket/analyze-v2') // Nueva versión con imagen
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('image')) // Intercepta el campo 'image' del formulario
+  @ApiOperation({
+    summary: 'Analiza un ticket con texto e imagen usando IA Multimodal',
+  })
+  async analyzeWithImage(
+    @Body() body: AnalyzeTicketDto,
+    @UploadedFile() file: Express.Multer.File,
+    @GetUser() user: any,
+  ) {
+    let imageUrl = null;
+
+    // 1. Si hay una foto, la subimos a Supabase
+    if (file) {
+      imageUrl = await this.storageService.uploadFile(file);
+    }
+
+    // 2. Analizamos con la IA (usando la nueva lógica multimodal)
+    const analysisString = file
+      ? await this.aiService.analyzeTicketWithImage(
+          body.description,
+          file.buffer,
+          file.mimetype,
+        )
+      : await this.aiService.analyzeTicket(body.description);
+
+    const analysis = JSON.parse(
+      analysisString.replace(/```json|```/g, '').trim(),
+    );
+
+    // 3. Guardamos en la DB con la URL de la imagen
+    const newTicket = await this.prisma.ticket.create({
+      data: {
+        description: body.description,
+        category: analysis.categoria,
+        priority: analysis.prioridad,
+        aiSummary: analysis.resumen,
+        status: 'OPEN',
+        reporterId: user.userId,
+        imageUrl: imageUrl, // <--- Guardamos la prueba visual
+      },
+    });
+
+    return {
+      success: true,
+      data: newTicket,
+      analysis: analysis,
+    };
   }
 }

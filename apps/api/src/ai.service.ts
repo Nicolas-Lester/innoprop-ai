@@ -66,4 +66,24 @@ constructor(private configService: ConfigService) {
     const raw = await this.generateWithRetry(prompt);
     return raw;
   }
+
+  async analyzeTicketWithImage(description: string, imageBuffer: Buffer, mimeType: string) {
+  const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const prompt = `Analiza este problema de propiedad. 
+  Descripción del usuario: ${description}
+  Responde en JSON con: categoria, prioridad (BAJA, MEDIA, ALTA, CRITICA), resumen y pasos_sugeridos.`;
+
+  const imageParts = [
+    {
+      inlineData: {
+        data: imageBuffer.toString('base64'),
+        mimeType
+      },
+    },
+  ];
+
+  const result = await model.generateContent([prompt, ...imageParts]);
+  return result.response.text();
+}
 }

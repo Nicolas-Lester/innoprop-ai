@@ -50,6 +50,7 @@ model Lease {
 model Ticket {
   id          String   @id @default(uuid())
   description String
+  imageUrl   String?
   category    String?  // Detectado por IA (Plomería, Eléctrico, etc.)
   priority    String?  // Detectado por IA (Urgente, Alta, Media, Baja)
   aiSummary   String?  // Resumen técnico hecho por la IA
@@ -60,3 +61,4 @@ model Ticket {
   reporter    User?     @relation(fields: [reporterId], references: [id])
   createdAt   DateTime @default(now())
 }
+
