@@ -11,7 +11,9 @@ import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'; // <-- Imports
 
+@ApiTags('Tickets')
 @Controller()
 export class AppController {
   constructor(
@@ -27,6 +29,9 @@ export class AppController {
   }
 
   @Post('ticket/analyze')
+  @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
+  @ApiResponse({ status: 201, description: 'Ticket procesado y guardado con éxito.' })
+  @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   async analyze(@Body() body: AnalyzeTicketDto) {
     // <--- Ahora usamos el DTO
     const { description } = body;

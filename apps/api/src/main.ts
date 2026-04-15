@@ -1,17 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-  
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'; // <-- Importa Swagger
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
-  // 1. Habilitamos CORS para que el puerto 3000 pueda hablar con el 4000 sin bloqueos de seguridad del navegador
-  app.enableCors();
-
-  // 2. Cambiamos el puerto por defecto al 4000
+  
   app.useGlobalPipes(new ValidationPipe());
 
-  // 2. Cambiamos el puerto por defecto al 4000
-  await app.listen(process.env.PORT ?? 4000);
+  // Configuración de Swagger
+  const config = new DocumentBuilder()
+    .setTitle('InnoProp AI - Backend API')
+    .setDescription('Plataforma inteligente de gestión de propiedades con IA')
+    .setVersion('1.0')
+    .addTag('Tickets')
+    .build();
+    
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document); // Esto define la ruta /api
+
+  await app.listen(4000);
 }
 bootstrap();
