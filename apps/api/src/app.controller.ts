@@ -5,13 +5,16 @@ import {
   Body,
   HttpException,
   HttpStatus,
+  UseGuards, 
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport'; 
 import { AppService } from './app.service';
 import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger'; // <-- Imports
+import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { GetUser } from './common/decorators/get-user.decorator';
 
 @ApiTags('Tickets')
 @Controller()
@@ -27,16 +30,17 @@ export class AppController {
   getHello() {
     return this.appService.getHello();
   }
-@Get('tickets')
+
+  @UseGuards(AuthGuard('jwt')) // <--- AGREGADO: Ahora ver tickets requiere estar logueado
+  @ApiBearerAuth()
+  @Get('tickets')
   @ApiOperation({ summary: 'Obtiene el historial de tickets analizados' })
   @ApiResponse({ status: 200, description: 'Lista de tickets recuperada con éxito.' })
   async getTickets() {
     try {
       const tickets = await this.prisma.ticket.findMany({
-        orderBy: {
-          createdAt: 'desc', // Los más nuevos primero
-        },
-        take: 20, // Limitamos a los últimos 20 por ahora
+        orderBy: { createdAt: 'desc' },
+        take: 20,
       });
 
       return {
@@ -52,30 +56,24 @@ export class AppController {
     }
   }
 
-  @ApiBearerAuth() // <--- Esto le dice a Swagger: "Este endpoint requiere Token"
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Post('ticket/analyze')
   @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
   @ApiResponse({ status: 201, description: 'Ticket procesado y guardado con éxito.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
-  async analyze(@Body() body: AnalyzeTicketDto) {
-    // <--- Ahora usamos el DTO
+  async analyze(
+    @Body() body: AnalyzeTicketDto,
+    @GetUser() user: any // <--- Aquí ya tenemos al usuario (userId y email)
+  ) {
     const { description } = body;
-    // 1. Validación básica de entrada
-    if (!description) {
-      throw new HttpException(
-        'La descripción es obligatoria',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
 
     try {
-      // 2. Obtener y limpiar respuesta de la IA
       const analysisString = await this.aiService.analyzeTicket(description);
       const cleanJson = analysisString.replace(/```json|```/g, '').trim();
       const analysis = JSON.parse(cleanJson);
 
-      // 3. Persistencia en Supabase via Prisma
-      // Nota: propertyId y reporterId se omiten porque quedaron opcionales en el schema
+      // 3. Persistencia con VÍNCULO AL USUARIO
       const newTicket = await this.prisma.ticket.create({
         data: {
           description,
@@ -83,10 +81,10 @@ export class AppController {
           priority: analysis.prioridad,
           aiSummary: analysis.resumen,
           status: 'OPEN',
+          reporterId: user.userId, // <--- ¡ESTO ES LO QUE FALTABA CONECTAR!
         },
       });
 
-      // 4. Lógica de Notificación Automática
       let notified = false;
       const isUrgent = ['ALTA', 'CRITICA'].includes(analysis.prioridad);
 
@@ -99,7 +97,6 @@ export class AppController {
         notified = true;
       }
 
-      // 5. Respuesta estructurada
       return {
         success: true,
         message: 'Ticket procesado y guardado correctamente',
@@ -107,16 +104,15 @@ export class AppController {
           id: newTicket.id,
           categoria: newTicket.category,
           prioridad: newTicket.priority,
-          resumen: newTicket.aiSummary,
           notificado: notified,
+          usuario: user.email // Para confirmar en la respuesta
         },
         suggestions: analysis.pasos_sugeridos || [],
       };
     } catch (error) {
-      // Manejo de errores para evitar el 500 genérico si falla la IA o el JSON
       console.error('Error en el proceso de análisis:', error);
       throw new HttpException(
-        'Error interno al procesar el ticket. Revisa los logs del servidor.',
+        'Error interno al procesar el ticket.',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
