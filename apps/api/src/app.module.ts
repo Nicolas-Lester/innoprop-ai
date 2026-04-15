@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from './prisma.service';
 import { AIService } from './ai.service';
 import { EmailService } from './email.service';
+import { StorageService } from './storage.service';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
@@ -37,6 +38,7 @@ import { JwtStrategy } from './jwt.strategy';
     PrismaService,
     AIService,
     EmailService,
+    StorageService,
     AuthService,
     JwtStrategy,
   ],
