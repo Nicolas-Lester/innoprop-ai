@@ -57,5 +57,7 @@ export class AppController {
       ticketId: newTicket.id,
       urgentNotified: ['ALTA', 'CRITICA'].includes(analysis.prioridad),
     };
+    
+  
   }
 }
