@@ -2,6 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RegisterDto } from './dto/register.dto'; // <--- IMPORTANTE
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -20,7 +21,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Inicia sesión y devuelve un token JWT' })
   @ApiResponse({ status: 200, description: 'Login exitoso.' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas.' })
-  login(@Body() loginDto: Record<string, any>) {
+  login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto.email, loginDto.password);
   }
 }
