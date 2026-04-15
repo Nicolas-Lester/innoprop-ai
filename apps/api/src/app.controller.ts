@@ -26,7 +26,9 @@ export class AppController {
   }
 
   @Post('ticket/analyze')
-  async analyze(@Body('description') description: string) {
+  async analyze(@Body() body: AnalyzeTicketDto) {
+    // <--- Ahora usamos el DTO
+    const { description } = body;
     // 1. Validación básica de entrada
     if (!description) {
       throw new HttpException(
@@ -79,7 +81,6 @@ export class AppController {
         },
         suggestions: analysis.pasos_sugeridos || [],
       };
-
     } catch (error) {
       // Manejo de errores para evitar el 500 genérico si falla la IA o el JSON
       console.error('Error en el proceso de análisis:', error);
