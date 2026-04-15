@@ -6,6 +6,7 @@ import { PrismaService } from './prisma.service';
 import { AIService } from './ai.service';
 import { EmailService } from './email.service';
 import * as path from 'path';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -14,6 +15,13 @@ import * as path from 'path';
       envFilePath: path.join(__dirname, '../../../.env'),
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        // <--- Agrega el corchete aquí
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, AIService, EmailService],
