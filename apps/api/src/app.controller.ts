@@ -117,4 +117,33 @@ export class AppController {
       );
     }
   }
+
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @Get('tickets/me')
+  @ApiOperation({ summary: 'Obtiene solo los tickets creados por el usuario logueado' })
+  @ApiResponse({ status: 200, description: 'Lista de tus tickets recuperada.' })
+  async getMyTickets(@GetUser('userId') userId: string) {
+    try {
+      const tickets = await this.prisma.ticket.findMany({
+        where: { 
+          reporterId: userId // <--- Aquí ocurre el filtro de seguridad
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      return {
+        success: true,
+        count: tickets.length,
+        data: tickets,
+      };
+    } catch (error) {
+      throw new HttpException(
+        'Error al recuperar tus tickets',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }
