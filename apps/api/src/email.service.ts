@@ -7,7 +7,11 @@ export class EmailService {
   private resend: Resend;
 
   constructor(private configService: ConfigService) {
-    this.resend = new Resend(this.configService.get('RESEND_API_KEY'));
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!apiKey) {
+      console.warn('RESEND_API_KEY no configurada — el envío de emails está deshabilitado');
+    }
+    this.resend = new Resend(apiKey ?? 're_placeholder');
   }
 
   async sendUrgentNotification(category: string, summary: string, priority: string) {
