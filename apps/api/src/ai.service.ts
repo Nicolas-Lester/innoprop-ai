@@ -20,7 +20,7 @@ constructor(private configService: ConfigService) {
 
   onModuleInit() {
     // Usamos gemini-3-flash para que sea rápido y barato
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-3-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   }
 
   async analyzeTicket(description: string) {
