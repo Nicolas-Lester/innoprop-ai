@@ -1,12 +1,21 @@
-import { Controller, Get, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 import { AIService } from './ai.service';
+import { PrismaService } from './prisma.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly aiService: AIService // Inyectamos el servicio de IA
+    private readonly aiService: AIService, // Inyectamos el servicio de IA
+    private readonly prisma: PrismaService, // Inyectamos el servicio de Prisma
   ) {}
 
   @Get()
@@ -16,15 +25,30 @@ export class AppController {
 
   @Post('ticket/analyze')
   async analyze(@Body('description') description: string) {
-    try {
-      const analysis = await this.aiService.analyzeTicket(description);
-      return JSON.parse(analysis);
-    } catch (error: any) {
-      // Quota excedida o rate limit de Gemini
-      if (error?.status === 429 || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
-        throw new HttpException('Límite de uso de la IA alcanzado. Intenta en unos segundos.', HttpStatus.TOO_MANY_REQUESTS);
-      }
-      throw new HttpException(error?.message ?? 'Error al analizar el ticket', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+    // 1. Obtenemos el análisis de la IA
+    const analysisString = await this.aiService.analyzeTicket(description);
+    const analysis = JSON.parse(analysisString);
+
+    // 2. Lo guardamos en Supabase usando Prisma
+    const newTicket = await this.prisma.ticket.create({
+      data: {
+        description,
+        category: analysis.categoria,
+        priority: analysis.prioridad,
+        aiSummary: analysis.resumen, // <--- Cambiado de summary a aiSummary
+        status: 'OPEN',
+        // ⚠️ OJO: Tu esquema pide propertyId y reporterId obligatorios.
+        // Para que no te dé error ahora, vamos a poner IDs de prueba
+        // (Asegúrate de que estos IDs existan en tu DB o hazlos opcionales en el schema)
+        propertyId: 'id-de-propiedad-de-prueba',
+        reporterId: 'id-de-usuario-de-prueba',
+      },
+    });
+
+    return {
+      message: 'Ticket creado y analizado con éxito',
+      data: newTicket,
+      suggestions: analysis.pasos_sugeridos,
+    };
   }
 }
