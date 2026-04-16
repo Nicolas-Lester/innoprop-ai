@@ -17,6 +17,7 @@ export class AuthService {
       data: {
         ...data,
         password: hashedPassword,
+        // Prisma usará el default (TENANT) si no viene en el DTO
       },
     });
     const { password, ...result } = user;
@@ -27,9 +28,20 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     
     if (user && await bcrypt.compare(pass, user.password)) {
-      const payload = { sub: user.id, email: user.email };
+      // --- PAYLOAD ACTUALIZADO CON EL ROL ---
+      const payload = { 
+        sub: user.id, 
+        email: user.email, 
+        role: user.role // <--- Vital para que el RolesGuard funcione
+      };
+
       return {
         access_token: await this.jwtService.signAsync(payload),
+        user: {
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
       };
     }
     throw new UnauthorizedException('Credenciales inválidas');
