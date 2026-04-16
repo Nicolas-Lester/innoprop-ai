@@ -68,22 +68,32 @@ constructor(private configService: ConfigService) {
   }
 
   async analyzeTicketWithImage(description: string, imageBuffer: Buffer, mimeType: string) {
-  const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-  const prompt = `Analiza este problema de propiedad. 
+    const prompt = `Analiza este problema de propiedad. 
   Descripción del usuario: ${description}
-  Responde en JSON con: categoria, prioridad (BAJA, MEDIA, ALTA, CRITICA), resumen y pasos_sugeridos.`;
+  Responde ÚNICAMENTE en JSON con: categoria (GASFITERIA, ELECTRICIDAD, ESTRUCTURA, LIMPIEZA, OTROS), prioridad (BAJA, MEDIA, ALTA, CRITICA), resumen y pasos_sugeridos.`;
 
-  const imageParts = [
-    {
-      inlineData: {
-        data: imageBuffer.toString('base64'),
-        mimeType
+    const imageParts = [
+      {
+        inlineData: {
+          data: imageBuffer.toString('base64'),
+          mimeType,
+        },
       },
-    },
-  ];
+    ];
 
-  const result = await model.generateContent([prompt, ...imageParts]);
-  return result.response.text();
-}
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await this.model.generateContent([prompt, ...imageParts]);
+        return result.response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      } catch (error: any) {
+        const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
+        if (isRateLimit && attempt < 3) {
+          await new Promise(res => setTimeout(res, 2 ** attempt * 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('No se pudo analizar la imagen tras varios intentos');
+  }
 }
