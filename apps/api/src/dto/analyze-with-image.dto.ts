@@ -10,7 +10,7 @@ export class AnalyzeWithImageDto {
   @ApiProperty({ 
     type: 'string', 
     format: 'binary', 
-    description: 'Imagen de la avería (JPG/PNG)' 
+    description: 'Imagen de la avería (JPG, PNG, WEBP)' // <--- Actualizamos el texto aquí
   })
-  image: any; // Swagger usará este campo para el botón de archivo
+  image: any;
 }

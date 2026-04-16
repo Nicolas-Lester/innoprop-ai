@@ -28,6 +28,8 @@ import {
 import { GetUser } from './common/decorators/get-user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
+import { RolesGuard } from './common/guards/roles.guard';
+import { Roles } from './common/decorators/roles.decorator';
 
 @ApiTags('Tickets')
 @Controller()
@@ -45,11 +47,12 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  // 1. Obtener historial general (Últimos 20)
-  @UseGuards(AuthGuard('jwt'))
+  // 1. Obtener historial general (Últimos 20) - Solo Admins
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @Get('tickets')
-  @ApiOperation({ summary: 'Obtiene el historial global de tickets analizados' })
+  @ApiOperation({ summary: 'Obtiene el historial global (Solo ADMIN)' })
   @ApiResponse({ status: 200, description: 'Lista de tickets recuperada.' })
   async getTickets() {
     try {
@@ -84,7 +87,7 @@ export class AppController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Post('ticket/analyze')
-  @ApiOperation({ summary: 'Analiza un ticket usando IA (Solo texto) y lo guarda' })
+  @ApiOperation({ summary: 'Analiza un ticket usando IA (Solo texto)' })
   async analyze(@Body() body: AnalyzeTicketDto, @GetUser() user: any) {
     const { description } = body;
     try {
@@ -118,11 +121,19 @@ export class AppController {
     }
   }
 
-  // 4. Analizar ticket V2 (Texto + Imagen)
+  // 4. Analizar ticket V2 (Texto + Imagen) - SOPORTA WEBP
   @Post('ticket/analyze-v2')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard) // Protegido por JWT y Roles
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', {
+    fileFilter: (req, file, callback) => {
+      // Filtro para aceptar JPG, PNG y WEBP
+      if (!file.originalname.match(/\.(jpg|jpeg|png|webp)$/)) {
+        return callback(new HttpException('Formato de imagen no soportado (Solo JPG, PNG, WEBP)', HttpStatus.BAD_REQUEST), false);
+      }
+      callback(null, true);
+    },
+  }))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: AnalyzeWithImageDto })
   @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto) usando IA' })
@@ -138,19 +149,19 @@ export class AppController {
         throw new HttpException('La descripción es obligatoria', HttpStatus.BAD_REQUEST);
       }
 
-      // Subida a Supabase Storage
+      // 1. Subida a Supabase Storage
       if (file) {
         imageUrl = await this.storageService.uploadFile(file);
       }
 
-      // Análisis con Gemini Vision
+      // 2. Análisis con Gemini Vision
       const analysisString = file
         ? await this.aiService.analyzeTicketWithImage(body.description, file.buffer, file.mimetype)
         : await this.aiService.analyzeTicket(body.description);
 
       const analysis = JSON.parse(analysisString.replace(/```json|```/g, '').trim());
 
-      // Persistencia
+      // 3. Persistencia en la Base de Datos
       const newTicket = await this.prisma.ticket.create({
         data: {
           description: body.description,
@@ -163,7 +174,7 @@ export class AppController {
         },
       });
 
-      // Notificación de urgencia
+      // 4. Notificación de urgencia por Email
       let notified = false;
       if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
         await this.emailService.sendUrgentNotification(
@@ -180,16 +191,15 @@ export class AppController {
         analysis,
       };
 
-    } catch (error: unknown) {
+    } catch (error: any) {
       // Logs detallados para debugging
-      const err = error as Error;
       console.error('--- [ERROR EN ANALYZE-V2] ---');
-      console.error('Mensaje:', err.message);
-      console.error('Stack:', err.stack);
+      console.error('Mensaje:', error.message);
+      console.error('Stack:', error.stack);
       console.error('------------------------------');
 
       throw new HttpException(
-        `Error al procesar el ticket: ${err.message}`,
+        `Error al procesar el ticket: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
