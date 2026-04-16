@@ -180,15 +180,16 @@ export class AppController {
         analysis,
       };
 
-    } catch (error) {
+    } catch (error: unknown) {
       // Logs detallados para debugging
+      const err = error as Error;
       console.error('--- [ERROR EN ANALYZE-V2] ---');
-      console.error('Mensaje:', error.message);
-      console.error('Stack:', error.stack);
+      console.error('Mensaje:', err.message);
+      console.error('Stack:', err.stack);
       console.error('------------------------------');
 
       throw new HttpException(
-        `Error al procesar el ticket: ${error.message}`,
+        `Error al procesar el ticket: ${err.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -11,5 +11,5 @@ export enum TicketStatus {
 export class UpdateTicketStatusDto {
   @ApiProperty({ enum: TicketStatus, example: 'IN_PROGRESS' })
   @IsEnum(TicketStatus, { message: 'Estado no válido' })
-  status: TicketStatus;
+  status!: TicketStatus;
 }
