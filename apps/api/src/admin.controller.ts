@@ -21,8 +21,8 @@ export class AdminController {
   ) {
     return this.prisma.ticket.findMany({
       where: {
-        ...(priority && { priority }),
-        ...(status && { status }),
+        ...(priority && { priority: { equals: priority, mode: 'insensitive' } }),
+        ...(status && { status: { equals: status, mode: 'insensitive' } }),
       },
       orderBy: { createdAt: 'desc' },
       include: {
