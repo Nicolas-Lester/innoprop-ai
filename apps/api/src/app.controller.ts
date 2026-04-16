@@ -8,6 +8,7 @@ import {
   UseGuards,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import 'multer';
 import { AuthGuard } from '@nestjs/passport';
@@ -24,6 +25,7 @@ import {
   ApiBearerAuth,
   ApiConsumes,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { GetUser } from './common/decorators/get-user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -47,7 +49,7 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  // 1. Obtener historial general (Últimos 20) - Solo Admins
+  // 1. Obtener historial global (Solo ADMIN)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth()
@@ -58,7 +60,10 @@ export class AppController {
     try {
       const tickets = await this.prisma.ticket.findMany({
         orderBy: { createdAt: 'desc' },
-        take: 20,
+        take: 50,
+        include: {
+          reporter: { select: { email: true, name: true } }
+        }
       });
       return { success: true, count: tickets.length, data: tickets };
     } catch (error) {
@@ -66,15 +71,25 @@ export class AppController {
     }
   }
 
-  // 2. Obtener tickets del usuario actual
+  // 2. Obtener tickets del usuario logueado (Con FILTROS inteligentes)
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Get('tickets/me')
-  @ApiOperation({ summary: 'Obtiene solo los tickets creados por el usuario logueado' })
-  async getMyTickets(@GetUser('userId') userId: string) {
+  @ApiOperation({ summary: 'Obtiene tus tickets con filtros opcionales' })
+  @ApiQuery({ name: 'priority', required: false, example: 'ALTA' })
+  @ApiQuery({ name: 'status', required: false, example: 'OPEN' })
+  async getMyTickets(
+    @GetUser('userId') userId: string,
+    @Query('priority') priority?: string,
+    @Query('status') status?: string,
+  ) {
     try {
       const tickets = await this.prisma.ticket.findMany({
-        where: { reporterId: userId },
+        where: { 
+          reporterId: userId,
+          ...(priority && { priority: { equals: priority, mode: 'insensitive' } }),
+          ...(status && { status: { equals: status, mode: 'insensitive' } }),
+        },
         orderBy: { createdAt: 'desc' },
       });
       return { success: true, count: tickets.length, data: tickets };
@@ -121,22 +136,21 @@ export class AppController {
     }
   }
 
-  // 4. Analizar ticket V2 (Texto + Imagen) - SOPORTA WEBP
+  // 4. Analizar ticket V2 (Imagen + Texto) - Soporta WEBP
   @Post('ticket/analyze-v2')
-  @UseGuards(AuthGuard('jwt'), RolesGuard) // Protegido por JWT y Roles
+  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('image', {
     fileFilter: (req, file, callback) => {
-      // Filtro para aceptar JPG, PNG y WEBP
       if (!file.originalname.match(/\.(jpg|jpeg|png|webp)$/)) {
-        return callback(new HttpException('Formato de imagen no soportado (Solo JPG, PNG, WEBP)', HttpStatus.BAD_REQUEST), false);
+        return callback(new HttpException('Formato no soportado (Solo JPG, PNG, WEBP)', HttpStatus.BAD_REQUEST), false);
       }
       callback(null, true);
     },
   }))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: AnalyzeWithImageDto })
-  @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto) usando IA' })
+  @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto)' })
   async analyzeWithImage(
     @Body() body: any,
     @UploadedFile() file: Express.Multer.File,
@@ -149,19 +163,16 @@ export class AppController {
         throw new HttpException('La descripción es obligatoria', HttpStatus.BAD_REQUEST);
       }
 
-      // 1. Subida a Supabase Storage
       if (file) {
         imageUrl = await this.storageService.uploadFile(file);
       }
 
-      // 2. Análisis con Gemini Vision
       const analysisString = file
         ? await this.aiService.analyzeTicketWithImage(body.description, file.buffer, file.mimetype)
         : await this.aiService.analyzeTicket(body.description);
 
       const analysis = JSON.parse(analysisString.replace(/```json|```/g, '').trim());
 
-      // 3. Persistencia en la Base de Datos
       const newTicket = await this.prisma.ticket.create({
         data: {
           description: body.description,
@@ -174,7 +185,6 @@ export class AppController {
         },
       });
 
-      // 4. Notificación de urgencia por Email
       let notified = false;
       if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
         await this.emailService.sendUrgentNotification(
@@ -192,10 +202,8 @@ export class AppController {
       };
 
     } catch (error: any) {
-      // Logs detallados para debugging
       console.error('--- [ERROR EN ANALYZE-V2] ---');
       console.error('Mensaje:', error.message);
-      console.error('Stack:', error.stack);
       console.error('------------------------------');
 
       throw new HttpException(
