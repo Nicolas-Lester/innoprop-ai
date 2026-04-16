@@ -12,12 +12,14 @@ import {
 } from '@nestjs/common';
 import 'multer';
 import { AuthGuard } from '@nestjs/passport';
-import { AppService } from './app.service';
 import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
+import { StorageService } from './storage.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
 import { AnalyzeWithImageDto } from './dto/analyze-with-image.dto';
+import { GetUser } from './common/decorators/get-user.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiOperation,
   ApiResponse,
@@ -27,57 +29,25 @@ import {
   ApiBody,
   ApiQuery,
 } from '@nestjs/swagger';
-import { GetUser } from './common/decorators/get-user.decorator';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { StorageService } from './storage.service';
-import { RolesGuard } from './common/guards/roles.guard';
-import { Roles } from './common/decorators/roles.decorator';
 
 @ApiTags('Tickets')
 @Controller()
 export class AppController {
   constructor(
-    private readonly appService: AppService,
     private readonly aiService: AIService,
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly storageService: StorageService,
   ) {}
 
-  @Get()
-  getHello() {
-    return this.appService.getHello();
-  }
-
-  // 1. Obtener historial global (Solo ADMIN)
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('ADMIN')
-  @ApiBearerAuth()
-  @Get('tickets')
-  @ApiOperation({ summary: 'Obtiene el historial global (Solo ADMIN)' })
-  @ApiResponse({ status: 200, description: 'Lista de tickets recuperada.' })
-  async getTickets() {
-    try {
-      const tickets = await this.prisma.ticket.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        include: {
-          reporter: { select: { email: true, name: true } }
-        }
-      });
-      return { success: true, count: tickets.length, data: tickets };
-    } catch (error) {
-      throw new HttpException('Error al recuperar los tickets', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // 2. Obtener tickets del usuario logueado (Con FILTROS inteligentes)
+  // 1. OBTENER MIS TICKETS (Con filtros inteligentes para el usuario)
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Get('tickets/me')
-  @ApiOperation({ summary: 'Obtiene tus tickets con filtros opcionales' })
+  @ApiOperation({ summary: 'Obtiene tus tickets personales con filtros opcionales' })
   @ApiQuery({ name: 'priority', required: false, example: 'ALTA' })
   @ApiQuery({ name: 'status', required: false, example: 'OPEN' })
+  @ApiResponse({ status: 200, description: 'Lista de tus tickets recuperada.' })
   async getMyTickets(
     @GetUser('userId') userId: string,
     @Query('priority') priority?: string,
@@ -98,11 +68,11 @@ export class AppController {
     }
   }
 
-  // 3. Analizar ticket (Solo Texto)
+  // 2. ANALIZAR TICKET (Solo Texto)
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Post('ticket/analyze')
-  @ApiOperation({ summary: 'Analiza un ticket usando IA (Solo texto)' })
+  @ApiOperation({ summary: 'Analiza un ticket usando IA (Solo texto) y lo guarda' })
   async analyze(@Body() body: AnalyzeTicketDto, @GetUser() user: any) {
     const { description } = body;
     try {
@@ -132,11 +102,11 @@ export class AppController {
       return { success: true, data: newTicket, suggestions: analysis.pasos_sugeridos || [] };
     } catch (error) {
       console.error('Error en analyze:', error);
-      throw new HttpException('Error interno al procesar texto', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Error al procesar el análisis de texto', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  // 4. Analizar ticket V2 (Imagen + Texto) - Soporta WEBP
+  // 3. ANALIZAR TICKET V2 (Imagen + Texto) - Soporta WEBP/JPG/PNG
   @Post('ticket/analyze-v2')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -150,7 +120,7 @@ export class AppController {
   }))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: AnalyzeWithImageDto })
-  @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto)' })
+  @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto) usando IA' })
   async analyzeWithImage(
     @Body() body: any,
     @UploadedFile() file: Express.Multer.File,
@@ -163,16 +133,19 @@ export class AppController {
         throw new HttpException('La descripción es obligatoria', HttpStatus.BAD_REQUEST);
       }
 
+      // 1. Subida a Storage
       if (file) {
         imageUrl = await this.storageService.uploadFile(file);
       }
 
+      // 2. IA Vision (Gemini)
       const analysisString = file
         ? await this.aiService.analyzeTicketWithImage(body.description, file.buffer, file.mimetype)
         : await this.aiService.analyzeTicket(body.description);
 
       const analysis = JSON.parse(analysisString.replace(/```json|```/g, '').trim());
 
+      // 3. DB
       const newTicket = await this.prisma.ticket.create({
         data: {
           description: body.description,
@@ -185,6 +158,7 @@ export class AppController {
         },
       });
 
+      // 4. Notificación
       let notified = false;
       if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
         await this.emailService.sendUrgentNotification(
@@ -207,7 +181,7 @@ export class AppController {
       console.error('------------------------------');
 
       throw new HttpException(
-        `Error al procesar el ticket: ${error.message}`,
+        `Error en el procesamiento multimodal: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
