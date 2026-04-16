@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt'; // <-- Este es el que te falta para el error rojo
-import { ConfigModule } from '@nestjs/config'; // <-- Para el ConfigModule
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import * as path from 'path'; // <-- Importante para que funcione el path.join
+import * as path from 'path';
 
-// Controllers
+// --- CONTROLADORES ---
 import { AppController } from './app.controller';
 import { AuthController } from './auth.controller';
+import { AdminController } from './admin.controller';
 
-// Services
+// --- SERVICIOS ---
 import { AppService } from './app.service';
 import { AuthService } from './auth.service';
 import { PrismaService } from './prisma.service';
@@ -19,28 +20,38 @@ import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
+    // Configuración de JWT para Autenticación
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'SUPER_SECRET_KEY',
       signOptions: { expiresIn: '1d' },
     }),
+
+    // Configuración Global de Variables de Entorno
     ConfigModule.forRoot({
+      // Esta ruta busca el .env en la raíz del monorepo
       envFilePath: path.join(__dirname, '../../../.env'),
       isGlobal: true,
     }),
+
+    // Seguridad: Limitador de peticiones (Rate Limiting)
     ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 10,
+      ttl: 60000, // 1 minuto
+      limit: 15,    // Máximo 15 peticiones por minuto
     }]),
   ],
-  controllers: [AppController, AuthController],
+  controllers: [
+    AppController, 
+    AuthController, 
+    AdminController // Dashboard del Administrador
+  ],
   providers: [
     AppService,
     PrismaService,
     AIService,
     EmailService,
-    StorageService,
+    StorageService, // Subida a Supabase
     AuthService,
-    JwtStrategy,
+    JwtStrategy,    // Estrategia de validación de tokens
   ],
 })
 export class AppModule {}

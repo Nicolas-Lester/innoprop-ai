@@ -16,6 +16,7 @@ import { AIService } from './ai.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
 import { AnalyzeTicketDto } from './dto/analyze-ticket.dto';
+import { AnalyzeWithImageDto } from './dto/analyze-with-image.dto';
 import {
   ApiOperation,
   ApiResponse,
@@ -27,7 +28,6 @@ import {
 import { GetUser } from './common/decorators/get-user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
-import { AnalyzeWithImageDto } from './dto/analyze-with-image.dto';
 
 @ApiTags('Tickets')
 @Controller()
@@ -45,11 +45,12 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  // 1. Obtener historial general (Últimos 20)
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Get('tickets')
-  @ApiOperation({ summary: 'Obtiene el historial de tickets analizados' })
-  @ApiResponse({ status: 200, description: 'Lista de tickets recuperada con éxito.' })
+  @ApiOperation({ summary: 'Obtiene el historial global de tickets analizados' })
+  @ApiResponse({ status: 200, description: 'Lista de tickets recuperada.' })
   async getTickets() {
     try {
       const tickets = await this.prisma.ticket.findMany({
@@ -62,10 +63,28 @@ export class AppController {
     }
   }
 
+  // 2. Obtener tickets del usuario actual
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @Get('tickets/me')
+  @ApiOperation({ summary: 'Obtiene solo los tickets creados por el usuario logueado' })
+  async getMyTickets(@GetUser('userId') userId: string) {
+    try {
+      const tickets = await this.prisma.ticket.findMany({
+        where: { reporterId: userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      return { success: true, count: tickets.length, data: tickets };
+    } catch (error) {
+      throw new HttpException('Error al recuperar tus tickets', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 3. Analizar ticket (Solo Texto)
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Post('ticket/analyze')
-  @ApiOperation({ summary: 'Analiza un ticket usando IA y lo guarda en la DB' })
+  @ApiOperation({ summary: 'Analiza un ticket usando IA (Solo texto) y lo guarda' })
   async analyze(@Body() body: AnalyzeTicketDto, @GetUser() user: any) {
     const { description } = body;
     try {
@@ -95,34 +114,18 @@ export class AppController {
       return { success: true, data: newTicket, suggestions: analysis.pasos_sugeridos || [] };
     } catch (error) {
       console.error('Error en analyze:', error);
-      throw new HttpException('Error interno', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Error interno al procesar texto', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @ApiBearerAuth()
-  @Get('tickets/me')
-  @ApiOperation({ summary: 'Obtiene solo los tickets creados por el usuario logueado' })
-  async getMyTickets(@GetUser('userId') userId: string) {
-    try {
-      const tickets = await this.prisma.ticket.findMany({
-        where: { reporterId: userId },
-        orderBy: { createdAt: 'desc' },
-      });
-      return { success: true, count: tickets.length, data: tickets };
-    } catch (error) {
-      throw new HttpException('Error al recuperar tus tickets', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // --- MÉTODO ACTUALIZADO CON LOGS ---
+  // 4. Analizar ticket V2 (Texto + Imagen)
   @Post('ticket/analyze-v2')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('image'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: AnalyzeWithImageDto })
-  @ApiOperation({ summary: 'Analiza un ticket con texto e imagen usando IA Multimodal' })
+  @ApiOperation({ summary: 'Analiza un ticket multimodal (Imagen + Texto) usando IA' })
   async analyzeWithImage(
     @Body() body: any,
     @UploadedFile() file: Express.Multer.File,
@@ -131,24 +134,23 @@ export class AppController {
     let imageUrl: string | null = null;
 
     try {
-      // 1. Validar entrada
       if (!body.description) {
         throw new HttpException('La descripción es obligatoria', HttpStatus.BAD_REQUEST);
       }
 
-      // 2. Subir imagen si existe
+      // Subida a Supabase Storage
       if (file) {
         imageUrl = await this.storageService.uploadFile(file);
       }
 
-      // 3. Análisis IA Multimodal
+      // Análisis con Gemini Vision
       const analysisString = file
         ? await this.aiService.analyzeTicketWithImage(body.description, file.buffer, file.mimetype)
         : await this.aiService.analyzeTicket(body.description);
 
       const analysis = JSON.parse(analysisString.replace(/```json|```/g, '').trim());
 
-      // 4. Guardar en Base de Datos
+      // Persistencia
       const newTicket = await this.prisma.ticket.create({
         data: {
           description: body.description,
@@ -161,7 +163,7 @@ export class AppController {
         },
       });
 
-      // 5. Notificación Urgente
+      // Notificación de urgencia
       let notified = false;
       if (['ALTA', 'CRITICA'].includes(analysis.prioridad)) {
         await this.emailService.sendUrgentNotification(
@@ -179,7 +181,7 @@ export class AppController {
       };
 
     } catch (error) {
-      // --- AQUÍ ESTÁ EL LOG QUE REVELARÁ EL ERROR 500 ---
+      // Logs detallados para debugging
       console.error('--- [ERROR EN ANALYZE-V2] ---');
       console.error('Mensaje:', error.message);
       console.error('Stack:', error.stack);
