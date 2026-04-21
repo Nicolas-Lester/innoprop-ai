@@ -599,7 +599,7 @@ export default function DashboardPage() {
                           const gapW = 20;
                           const chartH = 105;
                           const padL = 8;
-                          const padB = 36;
+                          const padB = 56;
                           const padT = 30;
                           const svgW = padL + cats.length * (barW + gapW) + gapW;
                           const svgH = chartH + padB + padT;
@@ -649,10 +649,17 @@ export default function DashboardPage() {
                                       fill="white" fontSize="14" fontWeight="bold" fontFamily="system-ui,sans-serif">
                                       {cat.value}
                                     </text>
-                                    {/* label */}
-                                    <text x={x + barW / 2} y={svgH - 5} textAnchor="middle"
-                                      fill="#94a3b8" fontSize="9" fontFamily="system-ui,sans-serif">
-                                      {cat.label.length > 9 ? cat.label.slice(0, 9) : cat.label}
+                                    {/* label rotado para que quepa el nombre completo */}
+                                    <text
+                                      x={x + barW / 2}
+                                      y={padT + chartH + 14}
+                                      textAnchor="end"
+                                      fill="#94a3b8"
+                                      fontSize="9"
+                                      fontFamily="system-ui,sans-serif"
+                                      transform={`rotate(-40, ${x + barW / 2}, ${padT + chartH + 14})`}
+                                    >
+                                      {cat.label}
                                     </text>
                                   </g>
                                 );
