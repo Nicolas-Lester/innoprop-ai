@@ -100,9 +100,10 @@ export class AppController {
       }
 
       return { success: true, data: newTicket, suggestions: analysis.pasos_sugeridos || [] };
-    } catch (error) {
-      console.error('Error en analyze:', error);
-      throw new HttpException('Error al procesar el análisis de texto', HttpStatus.INTERNAL_SERVER_ERROR);
+    } catch (error: any) {
+      console.error('Error en analyze:', error.message || error);
+      const msg = error.message?.includes('Límite de IA') ? error.message : 'Error al procesar el análisis de texto';
+      throw new HttpException(msg, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
