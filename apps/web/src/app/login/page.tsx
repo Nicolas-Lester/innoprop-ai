@@ -1,4 +1,4 @@
-'use client'; // Necesario para usar estados y eventos
+'use client'; 
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -28,9 +28,11 @@ export default function LoginPage() {
         throw new Error(data.message || 'Credenciales inválidas');
       }
 
-      // Guardamos el token (Por ahora en localStorage para avanzar rápido)
+      // Guardamos el token
       localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user_role', data.role); // Útil para proteger rutas después
+      
+      // LA CORRECCIÓN CLAVE: Si data.role viene vacío o undefined, forzamos 'TENANT'
+      localStorage.setItem('user_role', data.role || 'TENANT'); 
 
       // Redirigimos al Home (Dashboard)
       router.push('/');

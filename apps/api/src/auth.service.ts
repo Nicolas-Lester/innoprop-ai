@@ -32,11 +32,12 @@ export class AuthService {
       const payload = { 
         sub: user.id, 
         email: user.email, 
-        role: user.role // <--- Vital para que el RolesGuard funcione
+        role: user.role // <--- Vital para que el RolesGuard funcione en otras rutas
       };
 
       return {
         access_token: await this.jwtService.signAsync(payload),
+        role: user.role, // <--- LA CORRECCIÓN: Lo enviamos en la raíz para el Frontend
         user: {
           email: user.email,
           name: user.name,
