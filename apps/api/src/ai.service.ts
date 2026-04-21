@@ -19,8 +19,8 @@ constructor(private configService: ConfigService) {
 }
 
   onModuleInit() {
-    // gemini-2.5-flash: último modelo disponible con cuota gratuita activa
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    if (!this.genAI) return;
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   }
 
   private async generateWithRetry(prompt: string, retries = 3): Promise<string> {
