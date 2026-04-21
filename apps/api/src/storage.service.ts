@@ -3,16 +3,22 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class StorageService {
-  private supabase: SupabaseClient;
+  private supabase: SupabaseClient | null = null;
 
   constructor() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_KEY || ''
-    );
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      this.supabase = createClient(supabaseUrl, supabaseKey);
+    } else {
+      console.warn('⚠️ SUPABASE_URL o SUPABASE_KEY no definidas. StorageService deshabilitado.');
+    }
   }
 
   async uploadFile(file: Express.Multer.File): Promise<string> {
+    if (!this.supabase) {
+      throw new Error('StorageService no está configurado. Agrega SUPABASE_URL y SUPABASE_KEY al .env');
+    }
     const fileName = `${Date.now()}-${file.originalname}`;
     
     const { data, error } = await this.supabase.storage
