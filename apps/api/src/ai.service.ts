@@ -4,15 +4,15 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AIService implements OnModuleInit {
-  private genAI: GoogleGenerativeAI;
+  private genAI!: GoogleGenerativeAI;
   private model!: GenerativeModel;
 
 constructor(private configService: ConfigService) {
   const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-  
-  // Validamos que la llave exista para que TypeScript esté tranquilo
+
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY no encontrada en las variables de entorno');
+    console.warn('⚠️ GEMINI_API_KEY no definida. El servicio de IA estará deshabilitado.');
+    return;
   }
 
   this.genAI = new GoogleGenerativeAI(apiKey);

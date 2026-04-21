@@ -28,8 +28,7 @@ import { JwtStrategy } from './jwt.strategy';
 
     // Configuración Global de Variables de Entorno
     ConfigModule.forRoot({
-      // Esta ruta busca el .env en la raíz del monorepo
-      envFilePath: path.join(__dirname, '../../../.env'),
+      envFilePath: path.join(__dirname, '../.env'),
       isGlobal: true,
     }),
 
