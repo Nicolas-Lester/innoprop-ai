@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import NewTicketForm from '../components/NewTicketForm';
 import AdminTicketTable from '../components/AdminTicketTable';
 
+
 // Definimos la interfaz para que TypeScript no se queje
 interface StatsData {
   total: number;
@@ -29,6 +30,11 @@ export default function DashboardPage() {
 
   const [showAdminTable, setShowAdminTable] = useState(false);
 
+  // Estados para filtros y UI de Tenants
+  const [activeFilter, setActiveFilter] = useState('ALL');
+  // Estado para guardar qué tarjetas están expandidas (guardamos los IDs)
+  const [expandedTickets, setExpandedTickets] = useState<string[]>([]);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('user_role');
@@ -47,6 +53,28 @@ export default function DashboardPage() {
       fetchMyTickets(token);
     }
   }, [router]);
+
+  // --- LÓGICA DE UI PARA TENANTS ---
+
+  // Función para abrir/cerrar detalles de una tarjeta
+  const toggleTicketDetails = (ticketId: string) => {
+    setExpandedTickets(prev => 
+      prev.includes(ticketId) 
+        ? prev.filter(id => id !== ticketId)
+        : [...prev, ticketId]
+    );
+  };
+
+  // Función para filtrar los tickets antes de mostrarlos
+  const getFilteredTickets = () => {
+    if (activeFilter === 'ALL') return myTickets;
+    if (activeFilter === 'OPEN' || activeFilter === 'RESOLVED') {
+      return myTickets.filter(t => t.status === activeFilter);
+    }
+    return myTickets.filter(t => t.category === activeFilter);
+  };
+
+  const filteredTickets = getFilteredTickets();
 
   // Función para traer los datos del ADMIN
   const fetchStats = async (token: string) => {
@@ -150,8 +178,8 @@ export default function DashboardPage() {
 
           {/* VISTA PARA RESIDENTES (TENANTS) */}
           {userRole !== 'ADMIN' && (
-            <div>
-              <div className="mb-8 p-8 bg-slate-900 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div className="animate-fade-in-up">
+              <div className="mb-8 p-8 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg">
                 <div>
                   <h2 className="text-2xl font-bold mb-2 text-white">Bienvenido a tu portal</h2>
                   <p className="text-slate-400 max-w-2xl">
@@ -160,51 +188,125 @@ export default function DashboardPage() {
                 </div>
                 <button 
                   onClick={() => setShowForm(true)}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20 whitespace-nowrap"
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-transform hover:scale-105 shadow-lg shadow-blue-500/20 whitespace-nowrap"
                 >
                   + Nuevo Reporte
                 </button>
               </div>
 
+              {/* CONTROLES DE FILTRADO */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h3 className="text-xl font-bold">Mis Reportes ({filteredTickets.length})</h3>
+                
+                {/* Botones de Filtro (Píldoras) */}
+                {myTickets.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {['ALL', 'OPEN', 'RESOLVED', 'GASFITERIA', 'ESTRUCTURA', 'ELECTRICIDAD'].map((filter) => {
+                      // Solo mostramos filtros de categoría si el usuario tiene tickets de esa categoría
+                      if (['GASFITERIA', 'ESTRUCTURA', 'ELECTRICIDAD'].includes(filter) && !myTickets.some(t => t.category === filter)) return null;
+
+                      return (
+                        <button
+                          key={filter}
+                          onClick={() => setActiveFilter(filter)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                            activeFilter === filter 
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/20' 
+                              : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          {filter === 'ALL' ? 'Todos' : filter === 'OPEN' ? 'Pendientes' : filter === 'RESOLVED' ? 'Resueltos' : filter}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* LISTA DE TICKETS DEL USUARIO */}
-              <h3 className="text-xl font-bold mb-4">Mis Reportes Recientes</h3>
               {myTickets.length === 0 ? (
-                <div className="p-8 border-2 border-dashed border-slate-800 rounded-xl text-center text-slate-500">
-                  Aún no has reportado ningún problema.
+                <div className="p-12 border-2 border-dashed border-slate-800 rounded-2xl text-center flex flex-col items-center justify-center bg-slate-900/50">
+                  <span className="text-4xl mb-4">🏠</span>
+                  <p className="text-slate-400 font-medium">Todo está en orden.</p>
+                  <p className="text-slate-500 text-sm mt-1">Aún no has reportado ningún problema.</p>
+                </div>
+              ) : filteredTickets.length === 0 ? (
+                 <div className="p-8 border border-slate-800 rounded-xl text-center text-slate-500 bg-slate-900/30">
+                  No hay tickets que coincidan con este filtro.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {myTickets.map((ticket) => (
-                    <div key={ticket.id} className="p-5 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all flex flex-col">
-                      <div className="flex justify-between items-start mb-3">
-                        <span className="text-xs font-bold px-2 py-1 bg-slate-800 rounded text-slate-300">
-                          {ticket.category}
-                        </span>
-                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                          ticket.priority === 'CRITICA' ? 'bg-red-500/20 text-red-500' : 
-                          ticket.priority === 'ALTA' ? 'bg-orange-500/20 text-orange-500' : 
-                          ticket.priority === 'MEDIA' ? 'bg-yellow-500/20 text-yellow-500' :
-                          'bg-green-500/20 text-green-500'
-                        }`}>
-                          Prioridad: {ticket.priority}
-                        </span>
+                  {filteredTickets.map((ticket) => {
+                    const isExpanded = expandedTickets.includes(ticket.id);
+
+                    return (
+                      <div key={ticket.id} className="p-5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-600 transition-all flex flex-col shadow-md">
+                        {/* Cabecera del Ticket */}
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-xs font-bold px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-md text-slate-300">
+                            {ticket.category}
+                          </span>
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${
+                            ticket.priority === 'CRITICA' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                            ticket.priority === 'ALTA' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 
+                            ticket.priority === 'MEDIA' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                            'bg-green-500/10 text-green-500 border-green-500/20'
+                          }`}>
+                            {ticket.priority}
+                          </span>
+                        </div>
+
+                        {/* Imagen Principal (Siempre visible si existe) */}
+                        {ticket.imageUrl && (
+                          <div className="mb-4 w-full h-36 relative rounded-lg overflow-hidden border border-slate-800 bg-slate-950/50 group">
+                            <img 
+                              src={ticket.imageUrl} 
+                              alt="Foto del problema" 
+                              className="object-cover w-full h-full opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                            />
+                          </div>
+                        )}
+
+                        {/* Estado y Fecha */}
+                        <div className="flex justify-between items-center text-xs text-slate-400 mb-4 pb-4 border-b border-slate-800">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${ticket.status === 'OPEN' ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
+                            <strong className="text-slate-200">{ticket.status === 'OPEN' ? 'En Revisión' : ticket.status}</strong>
+                          </div>
+                          <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                        </div>
+
+                        {/* Sección Colapsable (Detalles e IA) */}
+                        {isExpanded && (
+                          <div className="mb-4 animate-fade-in-down">
+                            <p className="text-sm text-slate-300 mb-4 bg-slate-950 p-3 rounded-lg border border-slate-800/50">
+                              <span className="text-slate-500 block text-xs mb-1">Tu reporte:</span>
+                              "{ticket.description}"
+                            </p>
+                            
+                            <div className="p-3 bg-blue-900/10 border border-blue-500/20 rounded-lg">
+                              <p className="text-xs text-blue-400 font-semibold mb-1 flex items-center gap-1.5">
+                                <span className="text-base">🤖</span> Análisis IA:
+                              </p>
+                              <p className="text-sm text-slate-300 leading-relaxed">{ticket.aiSummary}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Botón de Expandir/Contraer */}
+                        <button 
+                          onClick={() => toggleTicketDetails(ticket.id)}
+                          className="mt-auto w-full py-2 flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-white bg-slate-800/30 hover:bg-slate-800/80 rounded-lg transition-colors border border-transparent hover:border-slate-700"
+                        >
+                          {isExpanded ? (
+                            <><span>Ocultar detalles</span> <span>↑</span></>
+                          ) : (
+                            <><span>Ver reporte completo y análisis IA</span> <span>↓</span></>
+                          )}
+                        </button>
                       </div>
-                      <p className="text-sm text-slate-400 mb-4 line-clamp-2">"{ticket.description}"</p>
-                      
-                      {/* Análisis de la IA */}
-                      <div className="mt-auto p-3 bg-blue-900/10 border border-blue-500/20 rounded-lg">
-                        <p className="text-xs text-blue-400 font-semibold mb-1 flex items-center gap-1">
-                          <span>🤖</span> Análisis de InnoProp AI:
-                        </p>
-                        <p className="text-sm text-slate-300">{ticket.aiSummary}</p>
-                      </div>
-                      
-                      <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center text-xs text-slate-500">
-                        <span>Estado: <strong className="text-white">{ticket.status}</strong></span>
-                        <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -240,7 +342,7 @@ export default function DashboardPage() {
 
                     <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-center">
                        <button 
-                         onClick={() => setShowAdminTable(true)} // <--- AQUÍ LE DAMOS VIDA AL BOTÓN
+                         onClick={() => setShowAdminTable(true)}
                          className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20"
                        >
                          + Administrar Tickets

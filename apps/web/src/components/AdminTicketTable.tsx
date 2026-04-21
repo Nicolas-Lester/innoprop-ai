@@ -10,6 +10,7 @@ interface Ticket {
   status: string;
   aiSummary: string;
   createdAt: string;
+  imageUrl?: string | null; // <--- Agregamos imageUrl a la interfaz
 }
 
 interface AdminTicketTableProps {
@@ -34,17 +35,11 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
       if (!response.ok) throw new Error('Error al cargar la lista de tickets');
       
       const json = await response.json();
-      
-      // EL PARACAÍDAS: Evaluamos cómo viene la respuesta.
-      // Si viene como { data: [...] }, usamos json.data
-      // Si viene directamente como un Array [...], usamos json
-      // Si algo falla y no es ninguna, ponemos un array vacío []
       const ticketArray = json.data || json || [];
       setTickets(ticketArray);
-
     } catch (err: any) {
       setError(err.message);
-      setTickets([]); // Si hay error, vaciamos la tabla para que no explote
+      setTickets([]);
     } finally {
       setLoading(false);
     }
@@ -63,7 +58,6 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
 
       if (!response.ok) throw new Error('Error al actualizar el estado');
       
-      // Actualizamos la tabla localmente sin tener que recargar toda la página
       setTickets(tickets.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
     } catch (err: any) {
       alert(err.message);
@@ -92,7 +86,7 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
             <tr>
               <th className="px-4 py-3 rounded-tl-lg">Fecha</th>
               <th className="px-4 py-3">Categoría / Prioridad</th>
-              <th className="px-4 py-3">Descripción y Análisis IA</th>
+              <th className="px-4 py-3">Evidencia y Análisis IA</th>
               <th className="px-4 py-3 rounded-tr-lg w-48">Estado</th>
             </tr>
           </thead>
@@ -108,6 +102,7 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
                     <span className={`text-xs font-bold px-2 py-0.5 rounded w-max ${
                       ticket.priority === 'CRITICA' ? 'bg-red-500/20 text-red-500' : 
                       ticket.priority === 'ALTA' ? 'bg-orange-500/20 text-orange-500' : 
+                      ticket.priority === 'MEDIA' ? 'bg-yellow-500/20 text-yellow-500' :
                       'bg-green-500/20 text-green-500'
                     }`}>
                       {ticket.priority}
@@ -115,8 +110,23 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
                   </div>
                 </td>
                 <td className="px-4 py-4 max-w-md">
-                  <p className="text-slate-200 mb-1 truncate" title={ticket.description}>"{ticket.description}"</p>
-                  <p className="text-xs text-blue-400 line-clamp-2">🤖 {ticket.aiSummary}</p>
+                  {/* LA MAGIA VISUAL AQUÍ */}
+                  <div className="flex gap-4 items-start">
+                    {ticket.imageUrl && (
+                      <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-700 bg-slate-800">
+                        <img 
+                          src={ticket.imageUrl} 
+                          alt="Evidencia" 
+                          className="w-full h-full object-cover hover:scale-110 transition-transform cursor-pointer"
+                          onClick={() => window.open(ticket.imageUrl || '', '_blank')} // Abre la imagen original en otra pestaña
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-slate-200 mb-1 truncate" title={ticket.description}>"{ticket.description}"</p>
+                      <p className="text-xs text-blue-400 line-clamp-2">🤖 {ticket.aiSummary}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <select
@@ -135,7 +145,7 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
                 </td>
               </tr>
             ))}
-            {tickets.length === 0 && (
+            {tickets?.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
                   No hay tickets registrados en el sistema.
