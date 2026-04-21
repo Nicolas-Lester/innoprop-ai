@@ -32,8 +32,13 @@ constructor(private configService: ConfigService) {
       } catch (error: any) {
         const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
         if (isRateLimit && attempt < retries) {
-          // Espera 2^attempt segundos (2s, 4s, 8s)
-          await new Promise(res => setTimeout(res, 2 ** attempt * 1000));
+          // Intentar parsear el retryDelay sugerido por Google (ej: "32s")
+          const retryDelayMatch = error?.message?.match(/retry in (\d+(\.\d+)?)s/i);
+          const waitMs = retryDelayMatch
+            ? Math.ceil(parseFloat(retryDelayMatch[1])) * 1000
+            : 2 ** attempt * 15000; // fallback: 30s, 60s
+          console.warn(`⏳ Rate limit alcanzado. Reintentando en ${waitMs / 1000}s... (intento ${attempt}/${retries})`);
+          await new Promise(res => setTimeout(res, waitMs));
           continue;
         }
         throw error;
