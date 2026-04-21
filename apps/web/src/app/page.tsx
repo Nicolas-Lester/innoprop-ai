@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NewTicketForm from '../components/NewTicketForm';
+import AdminTicketTable from '../components/AdminTicketTable';
 
 // Definimos la interfaz para que TypeScript no se queje
 interface StatsData {
@@ -25,6 +26,8 @@ export default function DashboardPage() {
   
   // Estado para controlar si vemos el Dashboard o el Formulario
   const [showForm, setShowForm] = useState(false);
+
+  const [showAdminTable, setShowAdminTable] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -207,43 +210,62 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* VISTA EXCLUSIVA PARA ADMINS */}
+        {/* VISTA EXCLUSIVA PARA ADMINS */}
           {userRole === 'ADMIN' && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
-                  <p className="text-slate-400 text-sm mb-1">Total Incidencias</p>
-                  <p className="text-4xl font-bold text-white">{stats?.total || 0}</p>
+              {showAdminTable ? (
+                <div className="my-8">
+                  <AdminTicketTable 
+                    token={localStorage.getItem('token') || ''} 
+                    onBack={() => {
+                      setShowAdminTable(false);
+                      // Recargamos los stats por si algún ticket cambió de estado
+                      const token = localStorage.getItem('token');
+                      if (token) fetchStats(token);
+                    }} 
+                  />
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+                      <p className="text-slate-400 text-sm mb-1">Total Incidencias</p>
+                      <p className="text-4xl font-bold text-white">{stats?.total || 0}</p>
+                    </div>
 
-                <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
-                  <p className="text-slate-400 text-sm mb-1">Atención Urgente (Críticas)</p>
-                  <p className="text-4xl font-bold text-red-500">{criticalTickets}</p>
-                </div>
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+                      <p className="text-slate-400 text-sm mb-1">Atención Urgente (Críticas)</p>
+                      <p className="text-4xl font-bold text-red-500">{criticalTickets}</p>
+                    </div>
 
-                <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-center">
-                   <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20">
-                     + Administrar Tickets
-                   </button>
-                </div>
-              </div>
-              
-              <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
-                  <h2 className="text-lg font-semibold mb-4 text-slate-300">Tickets por Categoría</h2>
-                  <div className="space-y-3">
-                    {stats?.categoryDistribution?.map((cat, i) => (
-                      <div key={i} className="flex justify-between items-center border-b border-slate-800 pb-2">
-                        <span className="text-slate-400">{cat.label}</span>
-                        <span className="font-bold text-white">{cat.value}</span>
-                      </div>
-                    ))}
-                    {(!stats?.categoryDistribution || stats.categoryDistribution.length === 0) && (
-                      <p className="text-slate-500 text-sm italic">No hay datos aún.</p>
-                    )}
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-center">
+                       <button 
+                         onClick={() => setShowAdminTable(true)} // <--- AQUÍ LE DAMOS VIDA AL BOTÓN
+                         className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20"
+                       >
+                         + Administrar Tickets
+                       </button>
+                    </div>
                   </div>
-                </div>
-              </div>
+                  
+                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl">
+                      <h2 className="text-lg font-semibold mb-4 text-slate-300">Tickets por Categoría</h2>
+                      <div className="space-y-3">
+                        {stats?.categoryDistribution?.map((cat, i) => (
+                          <div key={i} className="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span className="text-slate-400">{cat.label}</span>
+                            <span className="font-bold text-white">{cat.value}</span>
+                          </div>
+                        ))}
+                        {(!stats?.categoryDistribution || stats.categoryDistribution.length === 0) && (
+                          <p className="text-slate-500 text-sm italic">No hay datos aún.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </>
