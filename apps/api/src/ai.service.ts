@@ -23,7 +23,7 @@ constructor(private configService: ConfigService) {
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   }
 
-  private async generateWithRetry(prompt: string, retries = 3): Promise<string> {
+  private async generateWithRetry(prompt: string, retries = 2): Promise<string> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const result = await this.model.generateContent(prompt);
@@ -32,14 +32,16 @@ constructor(private configService: ConfigService) {
       } catch (error: any) {
         const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
         if (isRateLimit && attempt < retries) {
-          // Intentar parsear el retryDelay sugerido por Google (ej: "32s")
           const retryDelayMatch = error?.message?.match(/retry in (\d+(\.\d+)?)s/i);
           const waitMs = retryDelayMatch
             ? Math.ceil(parseFloat(retryDelayMatch[1])) * 1000
-            : 2 ** attempt * 15000; // fallback: 30s, 60s
-          console.warn(`⏳ Rate limit alcanzado. Reintentando en ${waitMs / 1000}s... (intento ${attempt}/${retries})`);
+            : 60000; // fallback: 60s
+          console.warn(`⏳ Rate limit alcanzado. Reintentando en ${waitMs / 1000}s...`);
           await new Promise(res => setTimeout(res, waitMs));
           continue;
+        }
+        if (isRateLimit) {
+          throw new Error('Límite de IA alcanzado. Espera un momento e intenta de nuevo.');
         }
         throw error;
       }
