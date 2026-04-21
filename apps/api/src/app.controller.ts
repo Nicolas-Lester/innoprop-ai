@@ -134,9 +134,13 @@ export class AppController {
         throw new HttpException('La descripción es obligatoria', HttpStatus.BAD_REQUEST);
       }
 
-      // 1. Subida a Storage
+      // 1. Subida a Storage (opcional — solo si Supabase está configurado)
       if (file) {
-        imageUrl = await this.storageService.uploadFile(file);
+        try {
+          imageUrl = await this.storageService.uploadFile(file);
+        } catch (storageErr: any) {
+          console.warn('⚠️ Imagen no subida a Storage (Supabase no configurado). Continuando sin URL.');
+        }
       }
 
       // 2. IA Vision (Gemini)

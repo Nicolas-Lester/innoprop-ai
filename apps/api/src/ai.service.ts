@@ -7,29 +7,23 @@ export class AIService implements OnModuleInit {
   private genAI!: GoogleGenerativeAI;
   private model!: GenerativeModel;
 
-constructor(private configService: ConfigService) {
-  const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+  constructor(private configService: ConfigService) {
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
 
-  if (!apiKey) {
-    console.warn('⚠️ GEMINI_API_KEY no definida. El servicio de IA estará deshabilitado.');
-    return;
+    if (!apiKey) {
+      console.warn('⚠️ GEMINI_API_KEY no definida. El servicio de IA estará deshabilitado.');
+      return;
+    }
+
+    this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
-  this.genAI = new GoogleGenerativeAI(apiKey);
-}
+  onModuleInit() {
+    if (!this.genAI) return;
 
-onModuleInit() {
-  if (!this.genAI) return;
-
-  // Forzamos la versión 'v1' para el modelo 1.5-flash
-  // Esto soluciona el error 404 de endpoint no encontrado
-  this.model = this.genAI.getGenerativeModel(
-    { model: 'gemini-1.5-flash' },
-    { apiVersion: 'v1' } // <--- Agregamos este objeto de configuración
-  );
-  
-  console.log('✅ Servicio de IA reiniciado con Gemini 1.5 Flash (v1)');
-}
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    console.log('✅ Servicio de IA iniciado con gemini-2.5-flash');
+  }
 
   private async generateWithRetry(prompt: string, retries = 2): Promise<string> {
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -39,11 +33,17 @@ onModuleInit() {
         return response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
       } catch (error: any) {
         const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
+        const isDailyLimit = error?.message?.includes('RPD') || error?.message?.includes('Quota exceeded');
+        
+        if (isDailyLimit) {
+            throw new Error('Se acabó la cuota diaria de la IA. Revisa tu consola de Google AI Studio.');
+        }
+
         if (isRateLimit && attempt < retries) {
           const retryDelayMatch = error?.message?.match(/retry in (\d+(\.\d+)?)s/i);
           const waitMs = retryDelayMatch
             ? Math.ceil(parseFloat(retryDelayMatch[1])) * 1000
-            : 60000; // fallback: 60s
+            : 5000; // fallback: 5s en lugar de 60s para no bloquear la petición eternamente
           console.warn(`⏳ Rate limit alcanzado. Reintentando en ${waitMs / 1000}s...`);
           await new Promise(res => setTimeout(res, waitMs));
           continue;
