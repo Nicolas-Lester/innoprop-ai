@@ -18,16 +18,24 @@ constructor(private configService: ConfigService) {
   this.genAI = new GoogleGenerativeAI(apiKey);
 }
 
-  onModuleInit() {
-    if (!this.genAI) return;
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-  }
+onModuleInit() {
+  if (!this.genAI) return;
+
+  // Forzamos la versión 'v1' para el modelo 1.5-flash
+  // Esto soluciona el error 404 de endpoint no encontrado
+  this.model = this.genAI.getGenerativeModel(
+    { model: 'gemini-1.5-flash' },
+    { apiVersion: 'v1' } // <--- Agregamos este objeto de configuración
+  );
+  
+  console.log('✅ Servicio de IA reiniciado con Gemini 1.5 Flash (v1)');
+}
 
   private async generateWithRetry(prompt: string, retries = 2): Promise<string> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const result = await this.model.generateContent(prompt);
-        const response = await result.response;
+        const response = result.response;
         return response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
       } catch (error: any) {
         const isRateLimit = error?.status === 429 || error?.message?.includes('RESOURCE_EXHAUSTED');
