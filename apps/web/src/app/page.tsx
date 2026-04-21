@@ -14,6 +14,98 @@ interface StatsData {
   statusDistribution: { label: string; value: number }[];
 }
 
+// ── Category visual helpers ──────────────────────────────────────────────────
+
+const CATEGORY_STYLES: Record<string, { gradient: string; iconColor: string }> = {
+  GASFITERIA: {
+    gradient: 'linear-gradient(135deg, rgba(6,182,212,0.30) 0%, rgba(14,165,233,0.14) 55%, rgba(10,15,30,0.97) 100%)',
+    iconColor: '#22d3ee',
+  },
+  ESTRUCTURA: {
+    gradient: 'linear-gradient(135deg, rgba(249,115,22,0.30) 0%, rgba(234,88,12,0.14) 55%, rgba(10,15,30,0.97) 100%)',
+    iconColor: '#fb923c',
+  },
+  ELECTRICIDAD: {
+    gradient: 'linear-gradient(135deg, rgba(234,179,8,0.30) 0%, rgba(202,138,4,0.14) 55%, rgba(10,15,30,0.97) 100%)',
+    iconColor: '#facc15',
+  },
+  PLOMERIA: {
+    gradient: 'linear-gradient(135deg, rgba(59,130,246,0.30) 0%, rgba(37,99,235,0.14) 55%, rgba(10,15,30,0.97) 100%)',
+    iconColor: '#60a5fa',
+  },
+};
+const DEFAULT_CATEGORY_STYLE = {
+  gradient: 'linear-gradient(135deg, rgba(139,92,246,0.28) 0%, rgba(109,40,217,0.12) 55%, rgba(10,15,30,0.97) 100%)',
+  iconColor: '#a78bfa',
+};
+
+function CategoryIcon({ category, color }: { category: string; color: string }) {
+  if (category === 'GASFITERIA' || category === 'PLOMERIA') {
+    return (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2c-1.5 0-3 .8-4 2-1.5 1.8-1.5 4.2 0 6L9 12v6h6v-6l1-2c1.5-1.8 1.5-4.2 0-6-1-1.2-2.5-2-4-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 18h6M9 21h6" />
+      </svg>
+    );
+  }
+  if (category === 'ESTRUCTURA') {
+    return (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    );
+  }
+  if (category === 'ELECTRICIDAD') {
+    return (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    );
+  }
+  // default wrench
+  return (
+    <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+    </svg>
+  );
+}
+
+function DonutChart({ data }: { data: { label: string; value: number; color: string; glow: string }[] }) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const r = 54;
+  const cx = 76, cy = 76;
+  const circ = 2 * Math.PI * r;
+  let running = 0;
+  const segs = data.map(d => {
+    const len = (d.value / total) * circ;
+    const seg = { ...d, len, start: running };
+    running += len;
+    return seg;
+  });
+
+  return (
+    <svg width="152" height="152" viewBox="0 0 152 152" style={{ flexShrink: 0 }}>
+      <g transform="rotate(-90 76 76)">
+        {segs.map((seg, i) => (
+          <circle
+            key={i}
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={22}
+            strokeDasharray={`${seg.len} ${circ}`}
+            strokeDashoffset={-seg.start}
+            style={{ filter: `drop-shadow(0 0 6px ${seg.glow})` }}
+          />
+        ))}
+      </g>
+      <circle cx={cx} cy={cy} r={40} fill="#080d1a" />
+      <text x={cx} y={cy - 7} textAnchor="middle" fill="white" fontSize="24" fontWeight="bold" fontFamily="system-ui,sans-serif">{total}</text>
+      <text x={cx} y={cy + 11} textAnchor="middle" fill="#475569" fontSize="9" letterSpacing="1" fontFamily="system-ui,sans-serif">TICKETS</text>
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -309,8 +401,8 @@ export default function DashboardPage() {
                           className="glass-card rounded-2xl flex flex-col overflow-hidden animate-fade-in-up"
                           style={{ animationDelay: `${idx * 0.05}s`, animationFillMode: 'both' }}
                         >
-                          {/* Image */}
-                          {ticket.imageUrl && (
+                          {/* Image or Category Hero Placeholder */}
+                          {ticket.imageUrl ? (
                             <div className="relative w-full h-40 overflow-hidden bg-slate-900/50 flex-shrink-0">
                               <img
                                 src={ticket.imageUrl}
@@ -318,7 +410,34 @@ export default function DashboardPage() {
                                 className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
-                              {/* Priority badge overlay */}
+                              <div className="absolute top-3 right-3">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${priorityClass}`}>
+                                  {ticket.priority}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="relative w-full h-40 flex-shrink-0 flex items-center justify-center overflow-hidden"
+                              style={{ background: (CATEGORY_STYLES[ticket.category] ?? DEFAULT_CATEGORY_STYLE).gradient }}
+                            >
+                              <div className="absolute inset-0 bg-grid opacity-25 pointer-events-none" />
+                              <div
+                                className="absolute -bottom-10 -right-10 w-36 h-36 rounded-full opacity-20"
+                                style={{
+                                  background: (CATEGORY_STYLES[ticket.category] ?? DEFAULT_CATEGORY_STYLE).iconColor,
+                                  filter: 'blur(36px)',
+                                }}
+                              />
+                              <div className="relative z-10 flex flex-col items-center gap-2.5">
+                                <div className="w-14 h-14 rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+                                  <CategoryIcon
+                                    category={ticket.category}
+                                    color={(CATEGORY_STYLES[ticket.category] ?? DEFAULT_CATEGORY_STYLE).iconColor}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-white/45 tracking-wide">Sin evidencia fotográfica</span>
+                              </div>
                               <div className="absolute top-3 right-3">
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${priorityClass}`}>
                                   {ticket.priority}
@@ -328,25 +447,12 @@ export default function DashboardPage() {
                           )}
 
                           <div className="p-5 flex flex-col flex-1">
-                            {/* Badges (no image case) */}
-                            {!ticket.imageUrl && (
-                              <div className="flex justify-between items-center mb-3">
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/50">
-                                  {ticket.category}
-                                </span>
-                                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${priorityClass}`}>
-                                  {ticket.priority}
-                                </span>
-                              </div>
-                            )}
-                            {/* Category badge when image exists */}
-                            {ticket.imageUrl && (
-                              <div className="mb-3">
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/50">
-                                  {ticket.category}
-                                </span>
-                              </div>
-                            )}
+                            {/* Category badge */}
+                            <div className="mb-3">
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/50">
+                                {ticket.category}
+                              </span>
+                            </div>
 
                             {/* Status + Date */}
                             <div className="flex justify-between items-center py-2.5 border-y border-slate-800/50 mb-3">
@@ -477,93 +583,142 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* Distribution charts */}
+                    {/* Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-                      {/* Category */}
+                      {/* ── Bar Chart: Category Distribution ── */}
                       <div className="glass-card rounded-2xl p-6 animate-fade-in-up animate-delay-2">
                         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
                           <span className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-400 to-cyan-400 inline-block" />
                           Tickets por Categoría
                         </h2>
-                        <div className="space-y-4">
-                          {stats?.categoryDistribution?.map((cat, i) => {
-                            const total = stats.total || 1;
-                            const pct = Math.round((cat.value / total) * 100);
-                            const gradients = [
-                              'linear-gradient(90deg, #3b82f6, #06b6d4)',
-                              'linear-gradient(90deg, #8b5cf6, #ec4899)',
-                              'linear-gradient(90deg, #f59e0b, #ef4444)',
-                              'linear-gradient(90deg, #22c55e, #06b6d4)',
-                            ];
-                            return (
-                              <div key={i}>
-                                <div className="flex justify-between items-center mb-1.5">
-                                  <span className="text-sm text-slate-300 font-medium">{cat.label}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-slate-500">{pct}%</span>
-                                    <span className="text-sm font-bold text-white tabular-nums">{cat.value}</span>
-                                  </div>
-                                </div>
-                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all duration-1000"
-                                    style={{ width: `${pct}%`, background: gradients[i % gradients.length] }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {(!stats?.categoryDistribution || stats.categoryDistribution.length === 0) && (
-                            <p className="text-slate-500 text-sm italic">No hay datos aún.</p>
-                          )}
-                        </div>
+                        {stats?.categoryDistribution && stats.categoryDistribution.length > 0 ? (() => {
+                          const cats = stats.categoryDistribution;
+                          const maxVal = Math.max(...cats.map(c => c.value), 1);
+                          const barW = 52;
+                          const gapW = 20;
+                          const chartH = 105;
+                          const padL = 8;
+                          const padB = 36;
+                          const padT = 30;
+                          const svgW = padL + cats.length * (barW + gapW) + gapW;
+                          const svgH = chartH + padB + padT;
+                          const palettes: [string, string][] = [
+                            ['#3b82f6', '#06b6d4'],
+                            ['#8b5cf6', '#ec4899'],
+                            ['#f59e0b', '#ef4444'],
+                            ['#22c55e', '#06b6d4'],
+                            ['#f97316', '#a855f7'],
+                          ];
+                          return (
+                            <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ overflow: 'visible' }}>
+                              <defs>
+                                {cats.map((_, i) => (
+                                  <linearGradient key={i} id={`bgrad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor={palettes[i % palettes.length]![0]} />
+                                    <stop offset="100%" stopColor={palettes[i % palettes.length]![1]} stopOpacity="0.5" />
+                                  </linearGradient>
+                                ))}
+                              </defs>
+                              {/* horizontal grid lines */}
+                              {[0, 50, 100].map(pct => {
+                                const y = padT + chartH * (1 - pct / 100);
+                                return <line key={pct} x1={padL} y1={y} x2={svgW} y2={y} stroke="#1e293b" strokeWidth="1" />;
+                              })}
+                              {/* bars */}
+                              {cats.map((cat, i) => {
+                                const barH = Math.max((cat.value / maxVal) * chartH, 4);
+                                const x = padL + gapW + i * (barW + gapW);
+                                const y = padT + chartH - barH;
+                                const pct = Math.round((cat.value / (stats.total || 1)) * 100);
+                                return (
+                                  <g key={i}>
+                                    {/* glow shadow */}
+                                    <rect x={x + 6} y={y + 6} width={barW - 12} height={barH}
+                                      rx="4" fill={palettes[i % palettes.length]![0]} opacity="0.18"
+                                      style={{ filter: 'blur(8px)' }} />
+                                    {/* bar */}
+                                    <rect x={x} y={y} width={barW} height={barH} rx="7" fill={`url(#bgrad-${i})`} />
+                                    {/* percentage */}
+                                    <text x={x + barW / 2} y={y - 16} textAnchor="middle"
+                                      fill={palettes[i % palettes.length]![0]} fontSize="9" fontFamily="system-ui,sans-serif">
+                                      {pct}%
+                                    </text>
+                                    {/* value */}
+                                    <text x={x + barW / 2} y={y - 4} textAnchor="middle"
+                                      fill="white" fontSize="14" fontWeight="bold" fontFamily="system-ui,sans-serif">
+                                      {cat.value}
+                                    </text>
+                                    {/* label */}
+                                    <text x={x + barW / 2} y={svgH - 5} textAnchor="middle"
+                                      fill="#94a3b8" fontSize="9" fontFamily="system-ui,sans-serif">
+                                      {cat.label.length > 9 ? cat.label.slice(0, 9) : cat.label}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
+                          );
+                        })() : (
+                          <p className="text-slate-500 text-sm italic">No hay datos aún.</p>
+                        )}
                       </div>
 
-                      {/* Status */}
+                      {/* ── Donut Chart: Status Distribution ── */}
                       {stats?.statusDistribution && stats.statusDistribution.length > 0 && (
                         <div className="glass-card rounded-2xl p-6 animate-fade-in-up animate-delay-3">
                           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
                             <span className="w-1 h-4 rounded-full bg-gradient-to-b from-purple-400 to-pink-400 inline-block" />
                             Estado de Tickets
                           </h2>
-                          <div className="space-y-4">
-                            {stats.statusDistribution.map((s, i) => {
-                              const total = stats.total || 1;
-                              const pct = Math.round((s.value / total) * 100);
-                              const colors: Record<string, { bar: string; dot: string }> = {
-                                OPEN: { bar: '#eab308', dot: 'rgba(234,179,8,0.6)' },
-                                IN_PROGRESS: { bar: '#3b82f6', dot: 'rgba(59,130,246,0.6)' },
-                                RESOLVED: { bar: '#22c55e', dot: 'rgba(34,197,94,0.6)' },
-                              };
-                              const c = colors[s.label] ?? { bar: '#64748b', dot: 'rgba(100,116,139,0.6)' };
-                              return (
-                                <div key={i}>
-                                  <div className="flex justify-between items-center mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ background: c.bar, boxShadow: `0 0 8px ${c.dot}` }}
-                                      />
-                                      <span className="text-sm text-slate-300 font-medium">
-                                        {s.label === 'OPEN' ? 'Abierto' : s.label === 'IN_PROGRESS' ? 'En Progreso' : 'Resuelto'}
-                                      </span>
+                          {(() => {
+                            const STATUS_META: Record<string, { color: string; glow: string; label: string }> = {
+                              OPEN:        { color: '#eab308', glow: 'rgba(234,179,8,0.55)',  label: 'Abierto'     },
+                              IN_PROGRESS: { color: '#3b82f6', glow: 'rgba(59,130,246,0.55)', label: 'En Progreso' },
+                              RESOLVED:    { color: '#22c55e', glow: 'rgba(34,197,94,0.55)',  label: 'Resuelto'    },
+                            };
+                            const donutData = stats.statusDistribution.map(s => ({
+                              ...s,
+                              color: STATUS_META[s.label]?.color ?? '#64748b',
+                              glow:  STATUS_META[s.label]?.glow  ?? 'rgba(100,116,139,0.4)',
+                              displayLabel: STATUS_META[s.label]?.label ?? s.label,
+                            }));
+                            const tot = stats.total || 1;
+                            return (
+                              <div className="flex items-center gap-5">
+                                <DonutChart data={donutData} />
+                                <div className="flex-1 space-y-3">
+                                  {donutData.map((d, i) => (
+                                    <div key={i}>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <div className="flex items-center gap-2">
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                            style={{ background: d.color, boxShadow: `0 0 8px ${d.glow}` }}
+                                          />
+                                          <span className="text-sm text-slate-300">{d.displayLabel}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-slate-500">{Math.round((d.value / tot) * 100)}%</span>
+                                          <span className="text-sm font-bold tabular-nums" style={{ color: d.color }}>{d.value}</span>
+                                        </div>
+                                      </div>
+                                      <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full"
+                                          style={{
+                                            width: `${Math.round((d.value / tot) * 100)}%`,
+                                            background: d.color,
+                                            boxShadow: `0 0 6px ${d.glow}`,
+                                          }}
+                                        />
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-slate-500">{pct}%</span>
-                                      <span className="text-sm font-bold text-white tabular-nums">{s.value}</span>
-                                    </div>
-                                  </div>
-                                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full transition-all duration-1000"
-                                      style={{ width: `${pct}%`, background: c.bar }}
-                                    />
-                                  </div>
+                                  ))}
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
