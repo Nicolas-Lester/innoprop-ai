@@ -192,7 +192,7 @@ export default function AdminTicketTable({ token, onBack }: AdminTicketTableProp
                           ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400 focus:border-yellow-500/50'
                           : 'bg-green-500/10 border-green-500/30 text-green-400 focus:border-green-500/50'
                       }`}
-                      style={{ focusRingColor: 'transparent' }}
+                      style={{ outline: 'none' }}
                     >
                       <option value="OPEN" className="bg-slate-900 text-white font-normal">Abierto (OPEN)</option>
                       <option value="IN_PROGRESS" className="bg-slate-900 text-yellow-400 font-normal">En Progreso</option>
