@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "installCommand": "npm install -g pnpm@9 && cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @innoprop/database run db:generate && pnpm --filter api run build",
+  "functions": {
+    "dist/vercel.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "dist/vercel.js"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
 {
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "installCommand": "npm install -g pnpm@9 && cd ../.. && pnpm install --frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm turbo run build --filter=web"
 }
