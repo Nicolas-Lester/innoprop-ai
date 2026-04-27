@@ -2,6 +2,7 @@
   "version": 2,
   "installCommand": "npm install -g pnpm@9 && cd ../.. && pnpm install --frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm --filter @innoprop/database run db:generate",
+  "outputDirectory": ".",
   "functions": {
     "api/index.ts": {
       "memory": 1024,
