@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: innoprop-api
+    runtime: node
+    region: oregon
+    plan: free
+
+    # Render clona el repo completo; construimos desde la raíz del monorepo.
+    buildCommand: npm install -g pnpm@9 && pnpm install --include=dev && pnpm --filter @innoprop/database run db:generate && pnpm --filter api run build
+    startCommand: node apps/api/dist/main
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ── Base de datos (Supabase) ────────────────────────────────────────
+      # DATABASE_URL  → pooler URL  (ej: postgresql://postgres.xxx:password@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true)
+      - key: DATABASE_URL
+        sync: false
+
+      # ── Auth ────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false
+
+      # ── Google Gemini ────────────────────────────────────────────────────
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # ── Supabase Storage ────────────────────────────────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+      # ── Resend (emails) ─────────────────────────────────────────────────
+      - key: RESEND_API_KEY
+        sync: false
+
+      # ── CORS: agrega la URL de Vercel una vez que la tengas ─────────────
+      # Ejemplo: https://innoprop-ai.vercel.app
+      - key: CORS_ORIGIN
+        sync: false
